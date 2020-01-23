@@ -1,0 +1,21 @@
+{
+   "name": "sava",
+   "main": "sava.js",
+   "version": "1.0.0",
+   "author": {
+      "url": "https://github.com/tpkn/"
+   },
+   "dependencies": {
+      "request": "latest"
+   },
+   "repository": "https://github.com/tpkn/sava",
+   "license": "MIT",
+   "keywords": [
+      "request",
+      "ping",
+      "access",
+      "health",
+      "web",
+      "site"
+   ]
+}
