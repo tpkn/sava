@@ -1,4 +1,3 @@
-const fs = require('fs');
 const request = require('request');
 const EventEmitter = require('events');
 
@@ -8,9 +7,9 @@ class Sava extends EventEmitter {
 
       let { 
          url, 
-         log_file, 
          timeout = 10, 
          interval = 60, 
+         messages,
          max_errors_streak = 15, 
          body_size = 0,
          dev = false,
@@ -24,8 +23,15 @@ class Sava extends EventEmitter {
       this.body_size = body_size;
       this.errors_streak = 0;
 
-      if(typeof log_file !== 'undefined'){
-         this.logger = fs.createWriteStream(log_file, { flags: 'a' });
+      if(typeof messages === 'undefined'){
+         this.messages = {
+            OK              : 'Works as expected',
+            TIMEOUT         : 'Server does not respond',
+            NOT_FOUND       : 'Wrong url',
+            WRONG_BODY_SIZE : 'Wrong response body size: %s bytes',
+         }
+      }else{
+         this.messages = messages;
       }
       
       if(dev){
@@ -35,7 +41,6 @@ class Sava extends EventEmitter {
          console.log('(___/(__)(__)\\/(__)(__)');
          console.log('');
          console.log('URL:               ' + url);
-         console.log('LOG FILE:          ' + log_file);
          console.log('TIMEOUT:           ' + timeout, 'sec');
          console.log('INTERVAL:          ' + interval, 'sec');
          console.log('MAX ERRORS STREAK: ' + max_errors_streak);
@@ -47,18 +52,18 @@ class Sava extends EventEmitter {
       let time = Date.now();
 
       request({ url: this.url, encoding: null, timeout: this.timeout }, (err, res, body) => {
-         let date = new Date;
+         let date = this.date();
          let status = 'ok';
-         let message = 'works as expected';
+         let message = this.messages.OK;
          let delay = Date.now() - time;
          let size;
 
          if(err){
             status = 'error';
             if(err.message.indexOf('ETIMEDOUT') != -1){
-               message = 'server does not respond';
+               message = this.messages.TIMEOUT;
             }else if(err.message.indexOf('ENOTFOUND') != -1){
-               message = 'wrong url';
+               message = this.messages.NOT_FOUND;
             }else{
                message = err.message;
             }
@@ -71,7 +76,7 @@ class Sava extends EventEmitter {
 
             if(res_body_size !== this.body_size){
                status = 'error';
-               message = `wrong response body size: ${res_body_size} bytes`;
+               message = this.messages.WRONG_BODY_SIZE.replace('%s', res_body_size);
                size = res_body_size;
             }
          }
@@ -86,17 +91,8 @@ class Sava extends EventEmitter {
             this.errors_streak = 0;
          }
 
-
-         let result = { date, status, message, delay, size };
-
-
          // Emit result as event
-         this.emit('update', result);
-
-         // Save result localy
-         if(this.logger){
-            this.logger.write(Object.values(result).join(';') + `\r\n`);
-         }
+         this.emit('update', { date, status, message, delay, size });
       });
    }
 
@@ -106,11 +102,13 @@ class Sava extends EventEmitter {
       this.check();
    }
 
-   destroy(){
+   stop(){
       clearInterval(this.aid);
-      if(this.logger){
-         this.logger.kill();
-      }
+   }
+
+   date(){
+      let date = (new Date).toISOString();
+      return date.substr(0,10) + ' ' + date.substr(11,8);
    }
 }
 
