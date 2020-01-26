@@ -13,17 +13,18 @@ let health = new ServiceAvailability({
    body_size: 276423,
    timeout: 30,
    interval: 60, 
+   max_ping: 800,
    max_errors_streak: 10,
    messages: {
-      OK: 'Works fine',
-      TIMEOUT: '500',
-      NOT_FOUND: '404',
-      WRONG_BODY_SIZE: 'Wrong response size: %s bytes',
+      timeout: 'Server does not respond',
+      not_found: 'Wrong url',
+      high_ping: 'Ping is %s ms above the maximum',
+      wrong_body_size: 'Wrong response body size: %s bytes',
    }
 })
 
 health.on('update', (data) => {
-   // => {"date":"2020-01-23T22:37:15.820Z","status":"error","message":"404","delay":2503}
+   // => { date: "2020-01-23 22:37:15", status: "error", details: [ "404" ], ping: 2503 }
 })
 
 health.on('alarm', () => {

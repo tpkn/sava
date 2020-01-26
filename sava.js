@@ -10,6 +10,7 @@ class Sava extends EventEmitter {
          timeout = 10, 
          interval = 60, 
          messages,
+         max_ping = 0,
          max_errors_streak = 15, 
          body_size = 0,
          dev = false,
@@ -19,19 +20,21 @@ class Sava extends EventEmitter {
       this.url = url;
       this.timeout = timeout * 1000;
       this.interval = interval * 1000;
+      this.max_ping = max_ping;
       this.max_errors_streak = max_errors_streak;
       this.body_size = body_size;
       this.errors_streak = 0;
 
-      if(typeof messages === 'undefined'){
-         this.messages = {
-            OK              : 'Works as expected',
-            TIMEOUT         : 'Server does not respond',
-            NOT_FOUND       : 'Wrong url',
-            WRONG_BODY_SIZE : 'Wrong response body size: %s bytes',
-         }
-      }else{
-         this.messages = messages;
+      // Status details
+      this.messages = {
+         timeout: 'Server does not respond',
+         not_found: 'Wrong url',
+         high_ping: 'Ping is %s ms above the maximum',
+         wrong_body_size: 'Wrong response body size: %s bytes',
+      }
+
+      if(messages === Object(messages)){
+         this.messages = Object.assign(this.messages, messages);
       }
       
       if(dev){
@@ -52,31 +55,40 @@ class Sava extends EventEmitter {
       let time = Date.now();
 
       request({ url: this.url, encoding: null, timeout: this.timeout }, (err, res, body) => {
-         let date = this.date();
+         let date = this.datetime();
          let status = 'ok';
-         let message = this.messages.OK;
-         let delay = Date.now() - time;
+         let details = [];
+         let ping = Date.now() - time;
          let size;
 
          if(err){
             status = 'error';
             if(err.message.indexOf('ETIMEDOUT') != -1){
-               message = this.messages.TIMEOUT;
+               details.push(this.messages.timeout);
             }else if(err.message.indexOf('ENOTFOUND') != -1){
-               message = this.messages.NOT_FOUND;
+               details.push(this.messages.not_found);
             }else{
-               message = err.message;
+               details.push(err.message);
             }
          }else{
             let res_body_size = body.length;
 
+            // Server error
             if(res.statusCode !== 200){
                status = 'error';
             }
 
+            // Partial response body
             if(res_body_size !== this.body_size){
                status = 'error';
-               message = this.messages.WRONG_BODY_SIZE.replace('%s', res_body_size);
+               details.push(this.messages.wrong_body_size.replace('%s', res_body_size));
+               size = res_body_size;
+            }
+
+            // High ping warning
+            if(this.max_ping > 0 && ping > this.max_ping){
+               status = 'error';
+               details.push(this.messages.high_ping.replace('%s', ping - this.max_ping));
                size = res_body_size;
             }
          }
@@ -84,15 +96,17 @@ class Sava extends EventEmitter {
          if(status == 'error'){
             this.errors_streak++;
             if(this.errors_streak == this.max_errors_streak){
-               this.emit('alarm', { message });
+               this.emit('alarm', { details });
             }
          }else{
             // Clear errors streak
             this.errors_streak = 0;
          }
 
-         // Emit result as event
-         this.emit('update', { date, status, message, delay, size });
+
+         // Emit result
+         this.emit('update', { date, status, details, ping, size });
+
       });
    }
 
@@ -106,7 +120,7 @@ class Sava extends EventEmitter {
       clearInterval(this.aid);
    }
 
-   date(){
+   datetime(){
       let date = (new Date).toISOString();
       return date.substr(0,10) + ' ' + date.substr(11,8);
    }
