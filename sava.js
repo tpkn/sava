@@ -1,3 +1,6 @@
+/**
+ * Sava, http://tpkn.me/
+ */
 const request = require('request');
 const EventEmitter = require('events');
 
