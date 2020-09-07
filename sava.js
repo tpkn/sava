@@ -1,6 +1,7 @@
 /**
  * Sava, http://tpkn.me/
  */
+const fs = require('fs');
 const request = require('request');
 const EventEmitter = require('events');
 
@@ -27,6 +28,14 @@ class Sava extends EventEmitter {
       this.max_errors_streak = max_errors_streak;
       this.body_size = body_size;
       this.errors_streak = 0;
+      this.cache_file = './.cache';
+
+      // Load cached file size
+      if(!body_size && fs.existsSync(this.cache_file)){
+         this.body_size = fs.readFileSync(this.cache_file, 'utf8');
+         console.log(this.body_size);
+      }
+
 
       // Status details
       this.messages = {
@@ -34,6 +43,7 @@ class Sava extends EventEmitter {
          not_found: 'Wrong url',
          high_ping: 'Ping is %s ms above the maximum',
          wrong_body_size: 'Wrong response body size: %s bytes',
+         init_failed: 'Initialization failed, the file is not available'
       }
 
       if(messages === Object(messages)){
@@ -46,19 +56,33 @@ class Sava extends EventEmitter {
          console.log('\\__ \\ /(__)\\\\  //(__)\\ ');
          console.log('(___/(__)(__)\\/(__)(__)');
          console.log('');
-         console.log('URL:               ' + url);
-         console.log('TIMEOUT:           ' + timeout, 'sec');
-         console.log('INTERVAL:          ' + interval, 'sec');
-         console.log('MAX ERRORS STREAK: ' + max_errors_streak);
+         console.log('url:               ' + url);
+         console.log('timeout:           ' + timeout, 'sec');
+         console.log('interval:          ' + interval, 'sec');
+         console.log('max errors streak: ' + max_errors_streak);
          console.log('');
       }
+   }
+
+   init(){
+      request({ url: this.url, encoding: null, timeout: this.timeout }, (err, res, body) => {
+         if(err){
+            this.emit('error', { message: this.messages.init_failed });
+            return
+         }
+
+         this.body_size = body.length;
+         fs.writeFileSync(this.cache_file, this.body_size, { flag: 'w' });
+
+         this.emit('init', { size: this.body_size });
+      })
    }
 
    check(){
       let time = Date.now();
 
       request({ url: this.url, encoding: null, timeout: this.timeout }, (err, res, body) => {
-         let date = this.datetime();
+         let date = this._datetime();
          let status = 'ok';
          let details = [];
          let ping = Date.now() - time;
@@ -123,7 +147,7 @@ class Sava extends EventEmitter {
       clearInterval(this.aid);
    }
 
-   datetime(){
+   _datetime(){
       let date = (new Date).toISOString();
       return date.substr(0,10) + ' ' + date.substr(11,8);
    }

@@ -20,6 +20,7 @@ let health = new ServiceAvailability({
       not_found: 'Wrong url',
       high_ping: 'Ping is %s ms above the maximum',
       wrong_body_size: 'Wrong response body size: %s bytes',
+      init_failed: 'Initialization failed, the file is not available'
    }
 })
 
@@ -36,4 +37,18 @@ health.on('alarm', () => {
 
 health.schedule();
 ```
+
+
+If you dont't want to calculate `body_size` of your reference file, you can call `init()` method, that will do that for you:
+
+```js
+health.on('init', ({ size }) => {
+   health.schedule();
+   console.log('size:', size);
+}); 
+
+health.init();
+```
+
+Received `body_size` will be saved to a '.cache' file.
 
